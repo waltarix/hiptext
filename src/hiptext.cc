@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
   // if (!isatty(1))
   //   FLAGS_color = false;
   google::SetUsageMessage("hiptext [FLAGS]");
-  google::SetVersionString("0.1");
+  google::SetVersionString("0.3");
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
