@@ -20,12 +20,14 @@ distclean-local:
 
 libhiptext_a_SOURCES = \
 	src/artiste.cc \
+	src/base64.cc \
 	src/charquantizer.cc \
 	src/css_color.rl \
 	src/font.cc \
 	src/graphic.cc \
 	src/hiptext.cc \
 	src/hiptext/artiste.h \
+	src/hiptext/base64.h \
 	src/hiptext/charquantizer.h \
 	src/hiptext/font.h \
 	src/hiptext/graphic.h \

@@ -17,7 +17,8 @@ using RenderAlgorithm = std::function<void(std::ostream&, const Graphic&)>;
 class Artiste {  // The one who lives in your terminal.
  public:
   Artiste(std::ostream& output, std::istream& input,
-          RenderAlgorithm algorithm, bool duopixel, bool use_sixel);
+          RenderAlgorithm algorithm, bool duopixel, bool use_sixel,
+          bool use_osc1337);
   // The Artiste refuses such mimicry. (As expected of a hippy.)
   Artiste(const Artiste& a) = delete;
   void operator=(const Artiste& a) = delete;
@@ -49,6 +50,11 @@ class Artiste {  // The one who lives in your terminal.
   int height_ = -1;
 
   bool cursor_saved_ = false;
+
+  bool use_osc1337_;
+
+  void PrepareOSC1337();
+  void CleanupOSC1337();
 };
 
 #endif  // HIPTEXT_ARTISTE_H_

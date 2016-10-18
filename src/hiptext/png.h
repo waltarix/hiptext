@@ -5,11 +5,12 @@
 #define HIPTEXT_PNG_H_
 
 #include <string>
+#include <vector>
 
 class Graphic;
 
 Graphic LoadPNG(const std::string& path);
-void WritePNG(const Graphic& graphic, const std::string& path);
+void WritePNG(const Graphic& graphic, std::vector<uint8_t>* out);
 
 #endif  // HIPTEXT_PNG_H_
 

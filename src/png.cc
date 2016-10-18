@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+#include <iostream>
+
 #include <glog/logging.h>
 #define PNG_SKIP_SETJMP_CHECK
 #include <png.h>
@@ -60,16 +62,18 @@ Graphic LoadPNG(const std::string& path) {
   return Graphic(width, height, std::move(pixels));
 }
 
-void WritePNG(const Graphic& graphic, const std::string& path) {
-  FILE* fp = fopen(path.c_str(), "wb");
-  PCHECK(fp) << path;
-  png_struct* png = png_create_write_struct(
-      PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+void PngWriteCallback(png_structp png_ptr, png_bytep data, png_size_t length) {
+  auto *p = (std::vector<uint8_t>*)png_get_io_ptr(png_ptr);
+  p->insert(p->end(), data, data + length);
+}
+
+void WritePNG(const Graphic& graphic, std::vector<uint8_t>* out) {
+  out->clear();
+  png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   CHECK_NOTNULL(png);
-  png_info* info = png_create_info_struct(png);
+  png_infop info = png_create_info_struct(png);
   CHECK_NOTNULL(info);
-  CHECK_EQ(0, setjmp(png_jmpbuf(png))) << "png write error: " << path;
-  png_init_io(png, fp);
+  png_set_write_fn(png, out, PngWriteCallback, NULL);
   png_set_IHDR(png, info, graphic.width(), graphic.height(),
                8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
                PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
@@ -79,6 +83,7 @@ void WritePNG(const Graphic& graphic, const std::string& path) {
   title.text = const_cast<char*>("Justine Tunney says hello :)");
   png_set_text(png, info, &title, 1);
   png_write_info(png, info);
+
   std::unique_ptr<uint8_t[]> row(new uint8_t[png_get_rowbytes(png, info)]);
   for (int y = 0; y < graphic.height(); ++y) {
     for (int x = 0; x < graphic.width(); ++x) {
@@ -90,9 +95,10 @@ void WritePNG(const Graphic& graphic, const std::string& path) {
     }
     png_write_row(png, row.get());
   }
+
   png_free_data(png, info, PNG_FREE_ALL, -1);
-  png_destroy_write_struct(&png, nullptr);
-  PCHECK(fclose(fp) == 0) << path;
+  png_destroy_write_struct(&png, &info);
+  png_write_end(png, info);
 }
 
 // For Emacs:

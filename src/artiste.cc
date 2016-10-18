@@ -27,6 +27,7 @@ DEFINE_int32(width, 0, "Width of rendering. Defaults to 0, in which case it "
            "terminal width");
 DEFINE_int32(height, 0, "Height of rendering. Defaults to 0, in which case it "
            "automatically maintains the aspect ratio with respect to width");
+DEFINE_int32(long_side, 0, "Long side of rendering. Defaults to 0");
 DEFINE_bool(equalize, false, "Use the histogram equalizer filter. You should "
             "use this when your image looks 'washed out' or grey when rendered "
             "in hiptext");
@@ -100,8 +101,10 @@ Artiste::Artiste(std::ostream& output,
                  std::istream& input,
                  RenderAlgorithm algorithm,
                  bool duo_pixel,
-                 bool use_sixel)
-    : output_(output), algorithm_(algorithm), duo_pixel_(duo_pixel) {
+                 bool use_sixel,
+                 bool use_osc1337)
+    : output_(output), algorithm_(algorithm), duo_pixel_(duo_pixel),
+      use_osc1337_(use_osc1337) {
   winsize ws;
   PCHECK(ioctl(0, TIOCGWINSZ, &ws) == 0);
   // Users' concept of a "pixel" shall be as square as possible.
@@ -120,6 +123,22 @@ Artiste::Artiste(std::ostream& output,
   }
 }
 
+void Artiste::PrepareOSC1337() {
+  if (!use_osc1337_)
+    return;
+
+  output_ << "\e[s\e[?25l";
+}
+
+void Artiste::CleanupOSC1337() {
+  if (!use_osc1337_)
+    return;
+
+  if (!g_done)
+    std::cin.get();
+  output_ << "\e[u\e[?25h";
+}
+
 void Artiste::ComputeDimensions(double media_ratio) {
   CHECK(algorithm_) << "No algorithm selected.";
   // Compute optimal output RGB dimensions given:
@@ -134,6 +153,10 @@ void Artiste::ComputeDimensions(double media_ratio) {
                           term_width_);
   double height = std::min(FLAGS_height ? FLAGS_height : term_height_,
                            term_height_);
+  if (FLAGS_long_side) {
+    width = FLAGS_long_side;
+    height = FLAGS_long_side;
+  }
   true_ratio_ = user_ratio_ ? user_ratio_ : media_ratio;
   LOG(INFO) << "Aspect Ratio: " << true_ratio_;
 
@@ -157,7 +180,15 @@ void Artiste::PrintImage(Graphic graphic) {
     graphic.Equalize();
     // graphic.FromYUV();
   }
+
+  struct sigaction sa;
+  sa.sa_handler = OnCtrlC;
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, NULL);
+
+  PrepareOSC1337();
   algorithm_(output_, graphic.BilinearScale(width_, height_));
+  CleanupOSC1337();
 }
 
 void Artiste::PrintMovie(Movie movie) {
@@ -166,9 +197,15 @@ void Artiste::PrintMovie(Movie movie) {
   ComputeDimensions(RatioOf(movie.width(), movie.height()));
   movie.PrepareRGB(width_, height_);
   HideCursor();
-  sighandler_t old_handler = signal(SIGINT, OnCtrlC);
+
+  struct sigaction sa;
+  sa.sa_handler = OnCtrlC;
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, NULL);
+
+  PrepareOSC1337();
   for (auto graphic : movie) {
-    if (g_done) {
+    if (g_done || movie.done()) {
       break;
     }
     ResetCursor();
@@ -183,7 +220,7 @@ void Artiste::PrintMovie(Movie movie) {
       std::getline(std::cin, lulz);
     }
   }
-  signal(SIGINT, old_handler);
+  CleanupOSC1337();
   ShowCursor();
 }
 
@@ -248,7 +285,8 @@ void Artiste::ShowCursor() {
 }
 
 void Artiste::ResetCursor() {
-  output_ << "\x1b[H";     // ANSI put cursor in top left.
+  //output_ << "\x1b[H";     // ANSI put cursor in top left.
+  output_ << "\x1b[u";     // ANSI restore cursor position.
 }
 
 // For Emacs:

@@ -27,6 +27,8 @@
 #include "hiptext/sixelprinter.h"
 #include "hiptext/unicode.h"
 
+#include "hiptext/base64.h"
+
 using std::cout;
 using std::string;
 using std::wstring;
@@ -52,6 +54,7 @@ DEFINE_bool(spectrum, false, "Show color spectrum graph");
 DEFINE_bool(sixel256, false, "Use sixel graphics (256 colors)");
 DEFINE_bool(sixel16, false, "Use sixel graphics (16 colors)");
 DEFINE_bool(sixel2, false, "Use sixel graphics (2 colors)");
+DEFINE_bool(osc1337, false, "Use OSC 1337 file protocol");
 
 static const wchar_t kUpperHalfBlock = L'\u2580';
 
@@ -110,6 +113,27 @@ void PrintImageSixel2(std::ostream& os, const Graphic& graphic) {
     out.LineFeed();
   }
   out.End();
+}
+
+void PrintImageOSC1337(std::ostream& os, const Graphic& graphic) {
+  std::vector<uint8_t> png;
+  WritePNG(graphic, &png);
+
+  std::string osc = "";
+  std::string st = "";
+  if (strncmp(std::getenv("TERM"), "screen", 6) == 0) {
+    osc = "\ePtmux;\e\e]";
+    st = "\a\e\\";
+  } else {
+    osc = "\e]";
+    st = "\a";
+  }
+
+  std::stringstream buf;
+  buf << osc << "1337;File=inline=1:"
+      << base64_encode(png.data(), png.size())
+      << st << "\n";
+  os << buf.str() << std::flush;
 }
 
 void PrintImageXterm256(std::ostream& os, const Graphic& graphic) {
@@ -226,6 +250,9 @@ int main(int argc, char** argv) {
     } else if (FLAGS_sixel256) {
       algo = PrintImageSixel256;
       duo_pixel = true;
+    } else if (FLAGS_osc1337) {
+      algo = PrintImageOSC1337;
+      duo_pixel = true;
     } else {
       algo = PrintImageXterm256;
     }
@@ -233,7 +260,8 @@ int main(int argc, char** argv) {
     algo = PrintImageNoColor;
   }
   Artiste artiste(std::cout, std::cin, algo, duo_pixel,
-                  FLAGS_sixel2 || FLAGS_sixel16 || FLAGS_sixel256);
+                  FLAGS_sixel2 || FLAGS_sixel16 || FLAGS_sixel256 || FLAGS_osc1337,
+                  FLAGS_osc1337);
 
   // Did they specify an option that requires no args?
   if (FLAGS_spectrum) {
@@ -256,7 +284,8 @@ int main(int argc, char** argv) {
   } else if (extension == "jpg" || extension == "jpeg") {
     artiste.PrintImage(LoadJPEG(path));
   } else if (extension == "mov" || extension == "mp4" || extension == "flv" ||
-             extension == "avi" || extension == "mkv" || path.find(uri_sig) != string::npos) {
+             extension == "avi" || extension == "mkv" || extension == "gif" ||
+             extension == "mpg" || extension == "webp" || path.find(uri_sig) != string::npos) {
     artiste.PrintMovie(Movie(path));
   } else {
     fprintf(stderr, "Unknown Filetype: %s\n", extension.data());
